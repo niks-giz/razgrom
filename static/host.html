@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кадровый кризис — ведущий</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>.wrap { max-width: 1280px; }</style>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <b>Панель ведущего</b><span id="phase" class="badge"></span><span data-timer></span>
+  <span class="grow" style="flex:1"></span>
+  <div class="tabs" id="tabs">
+    <button data-tab="control" class="on">Управление</button>
+    <button data-tab="teams">Команды</button>
+    <button data-tab="log">Журнал ответов</button>
+    <button data-tab="settings">Настройки</button>
+  </div>
+</div></div>
+<div class="wrap">
+  <div id="msg"></div>
+  <div id="pTop"></div>
+  <div id="pForm"></div>
+  <div id="pBody"></div>
+</div>
+<div id="modal"></div>
+<script src="/static/common.js"></script>
+<script src="/static/host.js"></script>
+</body>
+</html>

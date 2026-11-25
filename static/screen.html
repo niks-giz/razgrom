@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кадровый кризис — экран</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { font-size: 22px; }
+  .wrap { max-width: 1500px; }
+  .hdr { display: flex; align-items: center; gap: 20px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .hdr h1 { margin: 0; font-size: 1.5em; }
+  .hdr .timer { font-size: 2.4em; }
+  .url { font-size: 2em; font-weight: 800; color: var(--accent); }
+  .crisis h2 { font-size: 1.8em; }
+  .crisis pre { font-size: 1.15em; }
+  .teams { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .tm { background: var(--card2); border-radius: 12px; padding: 12px 16px; border: 2px solid var(--line); }
+  .tm.ok { border-color: var(--good); }
+  .podium { display: flex; justify-content: center; align-items: flex-end; gap: 20px; margin: 30px 0; }
+  .podium div { background: var(--card2); border-radius: 12px 12px 0 0; width: 260px; text-align: center; padding: 16px; }
+  .podium .p1 { height: 300px; border: 3px solid #ffd34d; } .podium .p2 { height: 230px; border: 3px solid #c0c8d8; } .podium .p3 { height: 180px; border: 3px solid #cd8a4f; }
+  .podium .place { font-size: 3em; }
+  table { font-size: 1em; }
+</style>
+</head>
+<body>
+<div class="hdr"><h1>Кадровый кризис</h1><span id="ph" class="badge" style="font-size:.8em"></span><span class="grow" style="flex:1"></span><span data-timer></span></div>
+<div class="wrap" id="main"></div>
+<script src="/static/common.js"></script>
+<script>
+let V = null;
+setInterval(() => document.querySelectorAll('[data-timer]').forEach(el => el.innerHTML = timerHtml()), 500);
+
+async function poll() {
+  try {
+    const d = await api('/api/screen?v=' + (V?.version || 0));
+    if (d.unchanged) Clock.set(d.time_left, V?.paused);
+    else { V = d; Clock.set(d.time_left, d.paused); render(); }
+  } catch (e) { $('#ph').textContent = 'нет связи'; }
+  setTimeout(poll, 1500);
+}
+
+function teamsBlock(status) {
+  return `<div class="teams">${V.teams.map(t => { const s = status(t); return `<div class="tm ${s[0] ? 'ok' : ''}"><b>${esc(t.name)}</b>
+    <div class="small muted">${esc(t.company)} · ${t.members} чел.</div><div>${s[1]}</div></div>`; }).join('') || '<p class="muted">Команд пока нет</p>'}</div>`;
+}
+
+function lb() { return V.leaderboard ? `<div class="card"><h2>Рейтинг</h2>${leaderboardHtml(V.leaderboard)}</div>` : ''; }
+
+function render() {
+  $('#ph').textContent = PHASES[V.phase] + (V.round ? ` · раунд ${V.round} из ${V.rounds}` : '');
+  const c = V.crisis ? `<div class="card crisis"><h2>${esc(V.crisis.title)}</h2><pre>${esc(V.crisis.text)}</pre></div>` : '';
+  let h = '';
+  if (V.phase === 'lobby') {
+    h = `<div class="card center"><p>Подключитесь к Wi-Fi ноутбука ведущего и откройте в браузере:</p>
+      ${V.urls.map(u => `<div class="url">${esc(u)}</div>`).join('')}
+      <p class="muted">Создайте команду или войдите по коду команды</p></div>
+      <div class="card"><h2>Команды</h2>${teamsBlock(t => [true, ''])}</div>`;
+  } else if (V.phase === 'passport') {
+    h = `<div class="card"><h2>Заполните паспорт организации: распределите ${money(V.capital)} и наберите команду</h2>
+      ${teamsBlock(t => [t.passport_done, t.passport_done ? '✔ Готово' : t.budget_confirmed ? '👥 Набор сотрудников' : '💰 Распределение бюджета'])}</div>
+      <p class="muted center small">Подключиться: ${V.urls.map(esc).join(' · ')}</p>`;
+  } else if (V.phase === 'prep') {
+    h = `<div class="card center"><h2>Ведущий готовит ${V.round ? 'следующий' : 'первый'} кризис…</h2></div>` + lb();
+  } else if (V.phase === 'round') {
+    h = c + `<div class="card"><h2>Ответы</h2>${teamsBlock(t => [t.submitted, t.submitted ? '✔ Ответ отправлен' : '✍ Думают…'])}</div>`;
+  } else if (V.phase === 'review') {
+    const st = { queued: '⏳ В очереди', running: '🤖 Анализ…', done: '✔ Оценено', error: '⚠ Проверяет ведущий' };
+    h = c + `<div class="card"><h2>Нейросеть анализирует ответы</h2>${teamsBlock(t => [t.eval === 'done', st[t.eval] || '…'])}</div>`;
+  } else if (V.phase === 'results') {
+    h = c + `<div class="card center"><h2>Результаты квартала — на ваших устройствах</h2></div>` + lb();
+  } else if (V.phase === 'final') {
+    const L = V.leaderboard || [];
+    const p = (r, cls) => r ? `<div class="${cls}"><div class="place">${r.rank}</div><h2>${esc(r.name)}</h2><div>${money(r.cash)}</div><div class="muted">рентаб. ${pct(r.margin)}</div><h2>${r.score}</h2></div>` : '';
+    h = `<h1 class="center" style="font-size:2.5em">🏆 Итоги игры</h1><div class="podium">${p(L[1], 'p2')}${p(L[0], 'p1')}${p(L[2], 'p3')}</div>` + lb();
+  }
+  $('#main').innerHTML = h;
+}
+poll();
+</script>
+</body>
+</html>
